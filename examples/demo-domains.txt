@@ -1,0 +1,20 @@
+# Demo domains for --ai-prewarm.
+#
+# These are made-up names, not real sites, chosen so the classifier has to use
+# judgement: some look risky and some contain risky substrings inside ordinary
+# words. They are not from any blocklist.
+sussex-community.net
+assessment-tools.org
+alphabet-school.com
+casino-bonus-guide.xyz
+slotsbonus.xyz
+free-spin-offers.net
+adult-content-hub.xyz
+malware-cleanup-tools.net
+ad-tracker.net
+betting-tips-daily.xyz
+online-casino-reviews.xyz
+ransomware-removal.net
+safe-kids-search.org
+gambling-help-line.org
+parental-controls-guide.org
