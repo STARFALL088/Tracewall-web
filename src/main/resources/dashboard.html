@@ -59,6 +59,17 @@
 </section>
 
 <section>
+  <h2>Override a domain</h2>
+  <form id="override-form">
+    <input id="override-domain" name="domain" placeholder="domain.tld" autocomplete="off"
+           spellcheck="false" style="font:inherit;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--fg);min-width:220px">
+    <button type="submit">Mark safe</button>
+    <button type="button" id="override-block">Block</button>
+  </form>
+  <p class="muted" style="margin:8px 0 0">An allow beats every list; a block is a custom deny that still loses to an explicit allow. Both persist to overrides.tsv.</p>
+</section>
+
+<section>
   <h2>AI verdicts</h2>
   <div class="scroll"><table>
     <thead><tr><th>domain</th><th>category</th><th>conf</th><th>override</th></tr></thead>
@@ -207,6 +218,16 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, 1000);
+
+document.getElementById("override-form").addEventListener("submit", event => {
+  event.preventDefault();
+  const domain = document.getElementById("override-domain").value.trim();
+  if (domain) override(domain, "allow");
+});
+document.getElementById("override-block").addEventListener("click", () => {
+  const domain = document.getElementById("override-domain").value.trim();
+  if (domain) override(domain, "block");
+});
 </script>
 </body>
 </html>
