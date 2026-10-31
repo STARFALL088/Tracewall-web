@@ -70,12 +70,14 @@ public final class Main {
         Stats stats = new Stats();
         EventLog events = new EventLog(200);
         AiClassifier ai = null;
+        OllamaClient chatClient = null;
         String aiModel = config.aiModel != null ? config.aiModel : System.getenv("TRACEWALL_AI_MODEL");
         if (aiModel != null && !aiModel.isBlank()) {
             OllamaClient client = new OllamaClient(config.aiUrl, java.time.Duration.ofSeconds(2),
                     java.time.Duration.ofSeconds(120), java.time.Duration.ofSeconds(30));
             AiClassifier.Options options = AiClassifier.Options.defaults()
                     .withStructuredOutput(config.aiSchema);
+            chatClient = client;
             ai = new AiClassifier(client, aiModel, config.aiWaitMs, config.aiCache,
                     options, java.time.Clock.systemUTC(), stats);
             System.out.println("AI classifier: model=" + aiModel + " url=" + client.baseUrl()
@@ -137,9 +139,11 @@ public final class Main {
         AiClassifier classifier = ai;
         Dashboard dashboard = null;
         if (config.dashboardPort > 0) {
+            ChatBot chat = new ChatBot(chatClient, aiModel, stats, events);
             dashboard = new Dashboard(InetAddress.getByName("127.0.0.1"), config.dashboardPort,
-                    policy, stats, events, ai);
+                    policy, stats, events, ai, chat);
             dashboard.start();
+            System.out.println("chat helper: " + (chat.usesModel() ? "model=" + aiModel : "docs only (no model)"));
             System.out.println("dashboard: http://127.0.0.1:" + dashboard.port()
                     + "  (write token: " + dashboard.token() + ")");
         }

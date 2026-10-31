@@ -63,6 +63,26 @@ public final class OllamaClient {
                 + ",\"format\":" + format
                 + ",\"keep_alive\":\"" + jsonEscape(keepAlive) + "\""
                 + ",\"options\":{\"temperature\":0}}";
+        return send(body);
+    }
+
+    /**
+     * Ask the model for free-form text (no JSON constraint), capped at
+     * {@code maxTokens} generated tokens. Used by the dashboard's chat helper.
+     *
+     * @return the raw JSON response body; the text is in its {@code response} field
+     */
+    public String generateText(String model, String prompt, String keepAlive, int maxTokens)
+            throws IOException, InterruptedException {
+        String body = "{\"model\":\"" + jsonEscape(model) + "\""
+                + ",\"prompt\":\"" + jsonEscape(prompt) + "\""
+                + ",\"stream\":false"
+                + ",\"keep_alive\":\"" + jsonEscape(keepAlive) + "\""
+                + ",\"options\":{\"temperature\":0,\"num_predict\":" + Math.max(16, maxTokens) + "}}";
+        return send(body);
+    }
+
+    private String send(String body) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(endpoint)
                 .timeout(modelWarm ? warmReadTimeout : coldReadTimeout)
                 .header("Content-Type", "application/json")

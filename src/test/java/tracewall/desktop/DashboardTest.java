@@ -128,6 +128,51 @@ class DashboardTest {
         assertFalse(Dashboard.originAllowed("http://evil.example", 8080));
     }
 
+    @Test
+    void chatWithoutTokenIsRejected() throws Exception {
+        try (Dashboard dashboard = dashboard(policy(tmp.resolve("o.tsv")))) {
+            assertEquals(403, postChat(dashboard, null, null, "{\"message\":\"hi\"}").statusCode());
+        }
+    }
+
+    @Test
+    void chatFromAForeignOriginIsRejected() throws Exception {
+        try (Dashboard dashboard = dashboard(policy(tmp.resolve("o.tsv")))) {
+            assertEquals(403, postChat(dashboard, dashboard.token(), "http://evil.example",
+                    "{\"message\":\"hi\"}").statusCode());
+        }
+    }
+
+    @Test
+    void chatAnswersFromTheDocsWhenNoModelIsConfigured() throws Exception {
+        try (Dashboard dashboard = dashboard(policy(tmp.resolve("o.tsv")))) {
+            HttpResponse<String> response = postChat(dashboard, dashboard.token(), null,
+                    "{\"message\":\"How do I mark a domain safe?\"}");
+            assertEquals(200, response.statusCode());
+            assertTrue(response.body().contains("\"ok\":true"));
+            assertTrue(response.body().contains("\"source\":\"docs\""));
+            assertTrue(response.body().contains("Mark safe"));
+        }
+    }
+
+    @Test
+    void chatRejectsMissingOrOversizedMessages() throws Exception {
+        try (Dashboard dashboard = dashboard(policy(tmp.resolve("o.tsv")))) {
+            assertEquals(400, postChat(dashboard, dashboard.token(), null, "{\"x\":1}").statusCode());
+            assertEquals(413, postChat(dashboard, dashboard.token(), null,
+                    "{\"message\":\"" + "a".repeat(5000) + "\"}").statusCode());
+        }
+    }
+
+    @Test
+    void pageHasTheChatWidget() throws Exception {
+        try (Dashboard dashboard = dashboard(policy(tmp.resolve("o.tsv")))) {
+            String page = get(dashboard, "/").body();
+            assertTrue(page.contains("id=\"chat-toggle\""));
+            assertTrue(page.contains("/api/chat"));
+        }
+    }
+
     private static HttpResponse<String> get(Dashboard dashboard, String path) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(
                 URI.create("http://127.0.0.1:" + dashboard.port() + path)).GET().build();
@@ -138,6 +183,17 @@ class DashboardTest {
                                              String body) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(
                         URI.create("http://127.0.0.1:" + dashboard.port() + "/api/override"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body));
+        if (token != null) builder.header("X-Tracewall-Token", token);
+        if (origin != null) builder.header("Origin", origin);
+        return HTTP.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private static HttpResponse<String> postChat(Dashboard dashboard, String token, String origin,
+                                                 String body) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(
+                        URI.create("http://127.0.0.1:" + dashboard.port() + "/api/chat"))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
         if (token != null) builder.header("X-Tracewall-Token", token);

@@ -58,7 +58,7 @@ another machine, change that line or delete it; the `java.toolchain` block in
 `build.gradle.kts` still compiles for Java 17.
 
 ```bash
-./gradlew test                                  # 33 tests, no network calls in the tests
+./gradlew test                                  # 53 tests, no network calls in the tests
 ./gradlew run --args="--lists lists --allow example.com"
 ```
 
@@ -72,7 +72,8 @@ python3 scripts/dnsq.py xvideos.com A           # same thing without dig
 ```
 
 The dashboard is at <http://127.0.0.1:8080>. Its write token is printed at
-startup and embedded in the page.
+startup and embedded in the page. The **Ask Tracewall** button in the corner
+opens a chat helper, described below.
 
 Useful flags:
 
@@ -128,6 +129,32 @@ Ollama serves one request per model at a time by default, so the two classifier
 workers can still queue behind each other, and prewarming a dozen names on CPU
 takes a while. That is a startup cost: after the cache is filled, a repeated
 domain is answered from memory or from `ai-cache.tsv`.
+
+## Ask Tracewall (chat helper)
+
+The dashboard has a small chat panel that answers questions about Tracewall:
+how a query is decided, what the stat cards mean, overrides, setup, privacy and
+the limits. It works in two modes:
+
+- **Docs only** (default, no model needed): it ranks the sections of
+  `src/main/resources/about.md` against the question and shows the best match.
+- **Model-backed** (when `--ai-model` or `TRACEWALL_AI_MODEL` is set): the same
+  local Ollama model is given the three best sections plus the live counters
+  and asked for a short answer. If the model is slow, busy, down or returns
+  nothing, the panel falls back to the docs answer and says so.
+
+Notes:
+
+- It only talks. It cannot change policy; for that, use the Override box.
+- Recently blocked hostnames are added to the prompt only when the Ollama URL
+  is loopback, so `--ai-url` pointing at another machine never receives your
+  browsing history.
+- One question is sent to the model at a time; a second one asked meanwhile
+  gets the docs answer instead of queueing behind a slow CPU model.
+- `POST /api/chat` needs the same token and Origin checks as `/api/override`;
+  messages are capped at 4 KB and truncated to 500 characters.
+- The answers are only as good as `about.md`. If you change behaviour, change
+  that file too.
 
 ## Trying the AI path without a model
 
@@ -213,7 +240,7 @@ Ollama endpoint you configure.
 
 ## Testing
 
-`./gradlew test` runs 33 JUnit 5 tests; none of them make a network call:
+`./gradlew test` runs 53 JUnit 5 tests; none of them make a network call:
 
 - 11 classifier tests: domain validation, JSON decoding, one model call per
   registrable domain, cache persistence, failure expiry, malformed output,
@@ -222,8 +249,12 @@ Ollama endpoint you configure.
   AAAA, question echo, allowlist precedence, AI threshold, list short-circuit;
 - 4 server tests: loopback round trip, garbage input survival, client allowlist,
   CIDR matching;
-- 9 dashboard tests: JSON endpoints, token rejection, origin rejection,
-  override precedence.
+- 14 dashboard tests: JSON endpoints, token rejection, origin rejection,
+  override precedence, chat endpoint auth and input limits, chat widget present;
+- 15 chat helper tests: section retrieval, allow/block wording, the four UI
+  suggestion chips, off-topic handling, model answer, docs fallback on model
+  error or empty answer, busy handling, hostname privacy rule, question
+  truncation.
 
 Everything model-related is exercised against an in-process fake Ollama
 (`com.sun.net.httpserver`). **No test runs a real model.** The classifier has not
@@ -237,6 +268,7 @@ src/main/java/tracewall/net/        engine, copied from Tracewall
 src/main/java/tracewall/blocklist/  engine, copied from Tracewall
 src/main/java/tracewall/desktop/    this project
 src/main/resources/dashboard.html   the whole UI, no build step
+src/main/resources/about.md         knowledge the chat helper answers from
 src/test/java/tracewall/desktop/    JUnit 5 tests and fakes
 lists/                              four hosts-format category lists
 eval/                               labelled sample for the accuracy harness

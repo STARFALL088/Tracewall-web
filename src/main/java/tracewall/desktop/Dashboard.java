@@ -33,21 +33,31 @@ public final class Dashboard implements AutoCloseable {
     private static final Pattern ACTION_FIELD =
             Pattern.compile("\"action\"\\s*:\\s*\"(allow|block)\"");
 
+    private static final int MAX_CHAT_BODY = 4096;
+
     private final HttpServer server;
     private final String token;
     private final PolicyHolder policy;
     private final Stats stats;
     private final EventLog events;
     private final AiClassifier ai;
+    private final ChatBot chat;
     private final String page;
     private final int port;
 
+    /** Docs-only chat helper; use the longer constructor to back it with a model. */
     public Dashboard(InetAddress bind, int port, PolicyHolder policy, Stats stats,
                      EventLog events, AiClassifier ai) throws IOException {
+        this(bind, port, policy, stats, events, ai, ChatBot.docsOnly(stats, events));
+    }
+
+    public Dashboard(InetAddress bind, int port, PolicyHolder policy, Stats stats,
+                     EventLog events, AiClassifier ai, ChatBot chat) throws IOException {
         this.policy = policy;
         this.stats = stats;
         this.events = events;
         this.ai = ai;
+        this.chat = chat;
         this.token = randomToken();
         this.server = HttpServer.create(new InetSocketAddress(bind, port), 0);
         this.port = server.getAddress().getPort();
@@ -81,11 +91,11 @@ public final class Dashboard implements AutoCloseable {
             }
             String method = exchange.getRequestMethod();
             if ("POST".equals(method)) {
-                if (!path.equals("/api/override")) {
-                    send(exchange, 405, "text/plain", "method not allowed\n");
-                    return;
+                switch (path) {
+                    case "/api/override" -> handleOverride(exchange);
+                    case "/api/chat" -> handleChat(exchange);
+                    default -> send(exchange, 405, "text/plain", "method not allowed\n");
                 }
-                handleOverride(exchange);
                 return;
             }
             if (!"GET".equals(method)) {
@@ -106,17 +116,40 @@ public final class Dashboard implements AutoCloseable {
         }
     }
 
-    private void handleOverride(HttpExchange exchange) throws IOException {
+    /** Origin and token checks shared by every POST; sends the 403 itself. */
+    private boolean authorised(HttpExchange exchange) throws IOException {
         String origin = exchange.getRequestHeaders().getFirst("Origin");
         if (origin != null && !originAllowed(origin, port)) {
             send(exchange, 403, "application/json", "{\"ok\":false,\"error\":\"bad origin\"}");
-            return;
+            return false;
         }
         String supplied = exchange.getRequestHeaders().getFirst("X-Tracewall-Token");
         if (!tokenMatches(supplied)) {
             send(exchange, 403, "application/json", "{\"ok\":false,\"error\":\"bad token\"}");
+            return false;
+        }
+        return true;
+    }
+
+    private void handleChat(HttpExchange exchange) throws IOException {
+        if (!authorised(exchange)) return;
+        byte[] raw = exchange.getRequestBody().readNBytes(MAX_CHAT_BODY + 1);
+        if (raw.length > MAX_CHAT_BODY) {
+            send(exchange, 413, "application/json", "{\"ok\":false,\"error\":\"message too long\"}");
             return;
         }
+        String message = AiClassifier.jsonStringField(new String(raw, StandardCharsets.UTF_8), "message");
+        if (message == null || message.isBlank()) {
+            send(exchange, 400, "application/json", "{\"ok\":false,\"error\":\"expected message\"}");
+            return;
+        }
+        ChatBot.Reply reply = chat.answer(message);
+        send(exchange, 200, "application/json", "{\"ok\":true,\"reply\":\"" + json(reply.text())
+                + "\",\"source\":\"" + reply.source() + "\"}");
+    }
+
+    private void handleOverride(HttpExchange exchange) throws IOException {
+        if (!authorised(exchange)) return;
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         Matcher domainMatcher = DOMAIN_FIELD.matcher(body);
         Matcher actionMatcher = ACTION_FIELD.matcher(body);
