@@ -92,6 +92,15 @@ public final class Main {
             System.out.println("AI classifier: off (no --ai-model and no TRACEWALL_AI_MODEL)");
         }
 
+        if (config.aiEval != null) {
+            if (ai == null) {
+                throw new IllegalArgumentException("--ai-eval needs --ai-model or TRACEWALL_AI_MODEL");
+            }
+            EvalRunner.run(config.aiEval, ai, config.aiThreshold, System.out);
+            ai.shutdown();
+            return;
+        }
+
         QueryHandler handler = new QueryHandler(policy, new Forwarder.Udp(forwarder), ai,
                 config.aiThreshold, stats, events);
         List<Cidr> allowClients = new ArrayList<>();
@@ -154,6 +163,7 @@ public final class Main {
         Path aiCache = Paths.get("ai-cache.tsv");
         boolean aiSchema;
         Path aiPrewarm;
+        Path aiEval;
         boolean help;
 
         Path overridesFile() {
@@ -185,6 +195,7 @@ public final class Main {
                         else throw new IllegalArgumentException("--ai-format must be json or schema");
                     }
                     case "--ai-prewarm" -> c.aiPrewarm = Paths.get(next(args, ++i));
+                    case "--ai-eval" -> c.aiEval = Paths.get(next(args, ++i));
                     default -> throw new IllegalArgumentException("unknown option " + args[i]);
                 }
             }
@@ -218,6 +229,7 @@ public final class Main {
                       --ai-format MODE    json (default, works everywhere) or schema
                                           (Ollama structured outputs, needs a recent Ollama)
                       --ai-prewarm FILE   classify one domain per line before serving
+                      --ai-eval FILE      TSV domain<TAB>category; print accuracy and exit
                       --help              this text
                     """);
         }

@@ -1,0 +1,60 @@
+# Tracewall Desktop - classifier sanity check
+#
+# Format: domain<TAB>true_category, one row per line.
+# Categories: adult, gambling, malware, ads, safe.
+#
+# HONESTY NOTE: the 20 positive rows are sampled from the same blocklists this
+# project ships (lists/*.txt), so the model is being asked about names that are
+# already known to be bad. This is a sanity check of the prompt and the
+# plumbing, not a benchmark. Accuracy on genuinely unseen domains will be
+# lower, and hostname-only classification cannot see page content.
+#
+# Run it with:
+#   ./gradlew run --args="--ai-eval eval/domains.tsv --ai-model <tag>"
+#
+# 10 benign, popular domains
+google.com	safe
+wikipedia.org	safe
+github.com	safe
+stackoverflow.com	safe
+bbc.co.uk	safe
+khanacademy.org	safe
+mozilla.org	safe
+python.org	safe
+arxiv.org	safe
+nasa.gov	safe
+# 10 benign names that contain risky-looking substrings
+sussex-community.net	safe
+assessment-tools.org	safe
+alphabet-school.com	safe
+scunthorpe-united.co.uk	safe
+penistone-grammar.org	safe
+therapist-finder.org	safe
+butter-scotch.net	safe
+grapefruit-recipes.com	safe
+analysis-services.net	safe
+middlesex-community.org	safe
+# 5 adult entries from lists/adult.txt
+adultlife.com	adult
+adultmedia.net	adult
+adultpornosex.com	adult
+amateur-sexe.biz	adult
+adultsonlytoys.com	adult
+# 5 gambling entries from lists/gambling.txt
+betway.com	gambling
+1xbet-1.com	gambling
+1xbet-bixx.top	gambling
+1xbet-bc2.top	gambling
+1xbet-c1yyykg.top	gambling
+# 5 ads entries from lists/ads.txt
+6degreesadvertising.com	ads
+act-advertising.com	ads
+ab.advertiserurl.com	ads
+3ds.ero-advertising.com	ads
+2fspeedclicks.ero-advertising.com	ads
+# 5 malware entries from lists/malware.txt
+royalindiancurryclub.com	malware
+zamilgroups.com	malware
+tenis-team-km.com	malware
+backupso.com	malware
+star.zcnet.net	malware

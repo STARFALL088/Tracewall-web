@@ -369,6 +369,17 @@ public final class AiClassifier {
         return cache.size();
     }
 
+    /**
+     * One classification for the evaluation harness: always asks the model,
+     * even when a cached verdict exists, so the latency numbers are real.
+     */
+    public Verdict evaluate(String host) {
+        String domain = registrable(host);
+        if (domain == null) return null;
+        Verdict verdict = classify(domain);
+        return verdict.category().equals("unknown") ? null : verdict;
+    }
+
     public void shutdown() {
         pool.shutdownNow();
     }
