@@ -1,6 +1,6 @@
 # MLH submission text
 
-Ready to paste. Keep the pitch under 140 characters; it is 135.
+Ready to paste. Keep the pitch under 140 characters; it is 110.
 
 ## Project name
 
@@ -74,6 +74,13 @@ Gemini or other provider client in the repository.
 - Repository: `<your public GitHub URL>`
 - Demo video: `<add after recording>`
 - Evaluation notes: `eval/domains.tsv` and the Testing section of the README.
+
+## Sponsor usage
+
+Ollama serves the open-weight model locally and is the only AI runtime the
+project calls, over loopback HTTP at `POST /api/generate`. The model's JSON
+verdict is the only mechanism that can block a domain no blocklist has seen, so
+the open-weight model is load-bearing rather than a demo bolt-on.
 
 ## Suggested prize category
 

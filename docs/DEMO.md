@@ -51,9 +51,11 @@ beats every category in the engine.
 dig @127.0.0.1 -p 5354 casino-bonus-guide.xyz +short
 ```
 
-Expect `0.0.0.0`. Say: no list knows this name. It was classified by the local
-model as gambling with high confidence, so it is blocked. This is the part the
-lists cannot do.
+Say: no list knows this name, so the local model was asked. If it comes back
+gambling above the threshold, this prints `0.0.0.0`, and that is the part the
+lists cannot do. If the model answers safe, do not claim a block: open the
+dashboard and use **Block** on that domain, and say the model was unsure and
+the manual override took over.
 
 ## Browser - overrides and live feed (about 45 seconds)
 

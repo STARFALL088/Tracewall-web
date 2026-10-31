@@ -51,11 +51,14 @@ allow.
 
 ## Quickstart
 
-Requires a JDK. Gradle runs on JDK 17 as pinned in `gradle.properties`; the
-wrapper downloads nothing else and the code has no third-party dependencies.
+Requires a JDK. The wrapper fetches Gradle 8.9 itself; the project has no
+third-party runtime dependencies. `gradle.properties` pins the Gradle JVM to
+`/usr/lib/jvm/java-17-openjdk`, the path on the machine this was built on. On
+another machine, change that line or delete it; the `java.toolchain` block in
+`build.gradle.kts` still compiles for Java 17.
 
 ```bash
-./gradlew test                                  # 33 tests, no network needed
+./gradlew test                                  # 33 tests, no network calls in the tests
 ./gradlew run --args="--lists lists --allow example.com"
 ```
 
@@ -121,6 +124,11 @@ What the classifier does:
 - can send a JSON schema with an enum of categories via `--ai-format schema`,
   which needs a recent Ollama; the default `json` mode works everywhere.
 
+Ollama serves one request per model at a time by default, so the two classifier
+workers can still queue behind each other, and prewarming a dozen names on CPU
+takes a while. That is a startup cost: after the cache is filled, a repeated
+domain is answered from memory or from `ai-cache.tsv`.
+
 ## Trying the AI path without a model
 
 If you want to exercise the classifier, dashboard and demo script before
@@ -144,7 +152,14 @@ The phone must be able to reach UDP port 53 on the laptop.
    `DNSStubListener=no` in `/etc/systemd/resolved.conf`, then
    `sudo systemctl restart systemd-resolved`. Point the laptop's own resolver at
    something else, for example `1.1.1.1`, so the laptop keeps working.
-2. Run with `sudo ./gradlew run --args="--port 53 --bind 0.0.0.0 --allow-client 192.168.1.0/24"`.
+2. Build once, then run the jar as root:
+
+   ```bash
+   ./gradlew fatJar
+   sudo java -jar build/libs/tracewall-desktop-1.0.0-all.jar \
+     --port 53 --bind 0.0.0.0 --allow-client 192.168.1.0/24 --lists lists
+   ```
+
    Port 53 needs root. Binding to `0.0.0.0` prints a warning because it is an
    open resolver for anything that can reach the machine; restrict it with
    `--allow-client`.
@@ -184,6 +199,9 @@ being true. Do not do that for a privacy-sensitive deployment.
 - **Category lists are incomplete.** About 95,000 merged entries; the upstream
   projects publish far more.
 - **UDP only, IPv4 upstream.** No DNS-over-TLS upstream and no IPv6 listening.
+- **No DNSSEC validation.** The filter relays whatever the upstream resolver
+  returns; it does not verify signatures itself, so it inherits the upstream's
+  trust model.
 
 ## AI tools disclosure
 
@@ -195,9 +213,9 @@ Ollama endpoint you configure.
 
 ## Testing
 
-`./gradlew test` runs 33 JUnit 5 tests with no network access:
+`./gradlew test` runs 33 JUnit 5 tests; none of them make a network call:
 
-- 10 classifier tests: domain validation, JSON decoding, one model call per
+- 11 classifier tests: domain validation, JSON decoding, one model call per
   registrable domain, cache persistence, failure expiry, malformed output,
   structured output;
 - 9 query handler tests: `0.0.0.0` for blocked A, empty NOERROR for blocked
