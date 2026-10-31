@@ -135,9 +135,19 @@ public final class Main {
         }
 
         AiClassifier classifier = ai;
+        Dashboard dashboard = null;
+        if (config.dashboardPort > 0) {
+            dashboard = new Dashboard(InetAddress.getByName("127.0.0.1"), config.dashboardPort,
+                    policy, stats, events, ai);
+            dashboard.start();
+            System.out.println("dashboard: http://127.0.0.1:" + dashboard.port()
+                    + "  (write token: " + dashboard.token() + ")");
+        }
+        Dashboard finalDashboard = dashboard;
         Thread finalStatsThread = statsThread;
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             server.close();
+            if (finalDashboard != null) finalDashboard.close();
             if (finalStatsThread != null) finalStatsThread.interrupt();
             if (classifier != null) classifier.shutdown();
         }, "shutdown"));
@@ -156,6 +166,7 @@ public final class Main {
         List<String> upstream = new ArrayList<>();
         List<String> allowClients = new ArrayList<>();
         long statsIntervalSeconds = 10;
+        int dashboardPort = 8080;
         String aiModel;
         String aiUrl = OllamaClient.DEFAULT_BASE_URL;
         long aiWaitMs = 1500;
@@ -182,6 +193,7 @@ public final class Main {
                     case "--allow" -> c.allow.add(next(args, ++i));
                     case "--allow-client" -> c.allowClients.add(next(args, ++i));
                     case "--stats-interval" -> c.statsIntervalSeconds = Long.parseLong(next(args, ++i));
+                    case "--dashboard-port" -> c.dashboardPort = Integer.parseInt(next(args, ++i));
                     case "--upstream" -> c.upstream.addAll(List.of(next(args, ++i).split(",")));
                     case "--ai-model" -> c.aiModel = next(args, ++i);
                     case "--ai-url" -> c.aiUrl = next(args, ++i);
@@ -219,6 +231,7 @@ public final class Main {
                       --allow DOMAIN      allowlist entry, repeatable
                       --allow-client CIDR serve only these client IPs, repeatable
                       --stats-interval N  print a stats line every N seconds (0 disables)
+                      --dashboard-port N  loopback dashboard port (default 8080, 0 disables)
                       --upstream IP[,IP]  upstream resolvers (default 1.1.1.1,8.8.8.8)
                       --ai-model TAG      Ollama model tag; omit to disable the AI layer
                                           (or set TRACEWALL_AI_MODEL)

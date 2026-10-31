@@ -380,6 +380,11 @@ public final class AiClassifier {
         return verdict.category().equals("unknown") ? null : verdict;
     }
 
+    /** A sorted snapshot of the cached verdicts, for the dashboard. */
+    public Map<String, Verdict> verdicts() {
+        return java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(cache));
+    }
+
     public void shutdown() {
         pool.shutdownNow();
     }

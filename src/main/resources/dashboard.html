@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tracewall Desktop</title>
+<style>
+  :root {
+    --bg: #f7f7f8; --fg: #14161a; --muted: #5f6672; --card: #ffffff;
+    --line: #e3e5e9; --accent: #0b6b4f; --bad: #b3261e; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1014; --fg: #e9eaee; --muted: #9aa1ad; --card: #171a20;
+      --line: #262a33; --accent: #5ee0a8; --bad: #ff8a80; --warn: #ffcc66;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-bottom: 16px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 16px; }
+  h2 { font-size: 15px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+  .BLOCK { color: var(--bad); font-weight: 700; }
+  .ALLOW { color: var(--accent); }
+  .SERVFAIL, .DROP { color: var(--warn); }
+  button {
+    font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: transparent; color: var(--fg); margin-right: 4px;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  .scroll { overflow-x: auto; }
+  ol { margin: 0; padding-left: 20px; }
+  @media (max-width: 560px) { body { padding: 10px; } .stat b { font-size: 18px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tracewall Desktop</h1>
+  <span class="muted">local DNS filter &middot; refreshes every second</span>
+</header>
+
+<div class="grid" id="stats"></div>
+
+<section>
+  <h2>Top blocked domains</h2>
+  <ol id="top"></ol>
+</section>
+
+<section>
+  <h2>AI verdicts</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>domain</th><th>category</th><th>conf</th><th>override</th></tr></thead>
+    <tbody id="verdicts"></tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Live queries</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>time</th><th>action</th><th>host</th><th>reason</th><th>client</th></tr></thead>
+    <tbody id="events"></tbody>
+  </table></div>
+</section>
+
+<script>
+"use strict";
+const TOKEN = "__TOKEN__";
+
+function cell(text, className) {
+  const td = document.createElement("td");
+  if (className) td.className = className;
+  td.textContent = text == null ? "" : String(text);
+  return td;
+}
+
+function statCard(label, value, suffix) {
+  const div = document.createElement("div");
+  div.className = "stat";
+  const b = document.createElement("b");
+  b.textContent = value + (suffix || "");
+  const span = document.createElement("span");
+  span.className = "muted";
+  span.textContent = label;
+  div.append(b, span);
+  return div;
+}
+
+function renderStats(s) {
+  const box = document.getElementById("stats");
+  box.replaceChildren(
+    statCard("queries", s.total),
+    statCard("blocked", s.blocked),
+    statCard("by list", s.blockedCategory),
+    statCard("by AI", s.blockedAi),
+    statCard("allowed", s.allowed),
+    statCard("servfail", s.servfail),
+    statCard("dropped", s.dropped),
+    statCard("AI calls", s.aiCalls)
+  );
+}
+
+function renderTop(events) {
+  const counts = new Map();
+  for (const e of events) {
+    if (e.action === "BLOCK") counts.set(e.host, (counts.get(e.host) || 0) + 1);
+  }
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const list = document.getElementById("top");
+  list.replaceChildren();
+  if (!top.length) {
+    const li = document.createElement("li");
+    li.className = "muted";
+    li.textContent = "nothing blocked yet";
+    list.append(li);
+    return;
+  }
+  for (const [host, n] of top) {
+    const li = document.createElement("li");
+    li.textContent = host + " ";
+    const span = document.createElement("span");
+    span.className = "muted";
+    span.textContent = "(" + n + ")";
+    li.append(span);
+    list.append(li);
+  }
+}
+
+function renderEvents(events) {
+  const body = document.getElementById("events");
+  body.replaceChildren();
+  for (const e of events.slice().reverse().slice(0, 200)) {
+    const tr = document.createElement("tr");
+    const time = new Date(e.time).toLocaleTimeString();
+    tr.append(cell(time), cell(e.action, e.action), cell(e.host, "mono"),
+      cell(e.reason), cell(e.client, "mono"));
+    body.append(tr);
+  }
+}
+
+async function override(domain, action) {
+  await fetch("/api/override", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Tracewall-Token": TOKEN },
+    body: JSON.stringify({ domain: domain, action: action })
+  });
+  refresh();
+}
+
+function renderVerdicts(verdicts) {
+  const body = document.getElementById("verdicts");
+  body.replaceChildren();
+  if (!verdicts.length) {
+    const tr = document.createElement("tr");
+    const td = cell("no verdicts yet - the model is only asked about names no list knows", "muted");
+    td.colSpan = 4;
+    tr.append(td);
+    body.append(tr);
+    return;
+  }
+  for (const v of verdicts) {
+    const tr = document.createElement("tr");
+    const actions = document.createElement("td");
+    const safe = document.createElement("button");
+    safe.textContent = "Mark safe";
+    safe.addEventListener("click", () => override(v.domain, "allow"));
+    const block = document.createElement("button");
+    block.textContent = "Block";
+    block.addEventListener("click", () => override(v.domain, "block"));
+    actions.append(safe, block);
+    tr.append(cell(v.domain, "mono"), cell(v.category), cell(v.confidence.toFixed(2)), actions);
+    body.append(tr);
+  }
+}
+
+let busy = false;
+async function refresh() {
+  if (busy) return;
+  busy = true;
+  try {
+    const [stats, events, verdicts] = await Promise.all([
+      fetch("/api/stats").then(r => r.json()),
+      fetch("/api/events").then(r => r.json()),
+      fetch("/api/verdicts").then(r => r.json())
+    ]);
+    renderStats(stats);
+    renderTop(events);
+    renderEvents(events);
+    renderVerdicts(verdicts);
+  } catch (err) {
+    // The server may be shutting down; the next tick retries.
+  } finally {
+    busy = false;
+  }
+}
+
+refresh();
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>
