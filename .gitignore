@@ -1,0 +1,20 @@
+# Build output
+build/
+out/
+.gradle/
+*.class
+
+# Runtime state
+*.log
+ai-cache.tsv
+overrides.tsv
+
+# IDE / editor
+.idea/
+*.iml
+.vscode/
+*.swp
+.DS_Store
+
+# Machine-local agent config (created by tooling, not part of the project)
+opencode.json
