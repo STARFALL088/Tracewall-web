@@ -140,7 +140,7 @@ public final class Main {
     /** Parsed command line. Package-private so tests can build one without a process. */
     static final class Config {
         int port = DEFAULT_PORT;
-        InetAddress bind = InetAddress.getLoopbackAddress();
+        InetAddress bind;
         Path lists = Paths.get("lists");
         Path overrides = Paths.get("overrides.tsv");
         List<String> allow = new ArrayList<>();
@@ -162,6 +162,7 @@ public final class Main {
 
         static Config parse(String[] args) throws IOException {
             Config c = new Config();
+            c.bind = InetAddress.getByName("127.0.0.1");
             for (int i = 0; i < args.length; i++) {
                 switch (args[i]) {
                     case "--help", "-h" -> c.help = true;
