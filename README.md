@@ -58,7 +58,7 @@ another machine, change that line or delete it; the `java.toolchain` block in
 `build.gradle.kts` still compiles for Java 17.
 
 ```bash
-./gradlew test                                  # 53 tests, no network calls in the tests
+./gradlew test                                  # 54 tests, no network calls in the tests
 ./gradlew run --args="--lists lists --allow example.com"
 ```
 
@@ -86,6 +86,7 @@ Useful flags:
 | `--upstream IP[,IP]` | upstream resolvers, default `1.1.1.1,8.8.8.8` |
 | `--stats-interval N` | stats line every N seconds, 0 disables |
 | `--dashboard-port N` | dashboard port, default 8080, 0 disables |
+| `--chat-model TAG` | model for the chat helper only; does not enable DNS classification |
 
 ## Adding the AI classifier
 
@@ -138,17 +139,20 @@ the limits. It works in two modes:
 
 - **Docs only** (default, no model needed): it ranks the sections of
   `src/main/resources/about.md` against the question and shows the best match.
-- **Model-backed** (when `--ai-model` or `TRACEWALL_AI_MODEL` is set): the same
-  local Ollama model is given the three best sections plus the live counters
-  and asked for a short answer. If the model is slow, busy, down or returns
-  nothing, the panel falls back to the docs answer and says so.
+- **Model-backed** (when `--chat-model`, `--ai-model` or `TRACEWALL_CHAT_MODEL`
+  is set): the same Ollama model is given the three best sections plus the live
+  counters and asked for a short answer. If the model is slow, busy, down or
+  returns nothing, the panel falls back to the docs answer and says so.
+  `--chat-model` exists so the chat can use a model without also making every
+  unseen DNS name wait on one.
 
 Notes:
 
 - It only talks. It cannot change policy; for that, use the Override box.
 - Recently blocked hostnames are added to the prompt only when the Ollama URL
-  is loopback, so `--ai-url` pointing at another machine never receives your
-  browsing history.
+  is loopback **and** the model tag is not a cloud tag (`-cloud` or `:cloud`),
+  so neither `--ai-url` pointing at another machine nor a model served by
+  ollama.com receives your browsing history.
 - One question is sent to the model at a time; a second one asked meanwhile
   gets the docs answer instead of queueing behind a slow CPU model.
 - `POST /api/chat` needs the same token and Origin checks as `/api/override`;
@@ -240,7 +244,7 @@ Ollama endpoint you configure.
 
 ## Testing
 
-`./gradlew test` runs 53 JUnit 5 tests; none of them make a network call:
+`./gradlew test` runs 54 JUnit 5 tests; none of them make a network call:
 
 - 11 classifier tests: domain validation, JSON decoding, one model call per
   registrable domain, cache persistence, failure expiry, malformed output,
@@ -251,10 +255,10 @@ Ollama endpoint you configure.
   CIDR matching;
 - 14 dashboard tests: JSON endpoints, token rejection, origin rejection,
   override precedence, chat endpoint auth and input limits, chat widget present;
-- 15 chat helper tests: section retrieval, allow/block wording, the four UI
+- 16 chat helper tests: section retrieval, allow/block wording, the four UI
   suggestion chips, off-topic handling, model answer, docs fallback on model
-  error or empty answer, busy handling, hostname privacy rule, question
-  truncation.
+  error or empty answer, busy handling, hostname privacy rule, cloud-tag
+  detection, question truncation.
 
 Everything model-related is exercised against an in-process fake Ollama
 (`com.sun.net.httpserver`). **No test runs a real model.** The classifier has not

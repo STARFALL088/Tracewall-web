@@ -129,8 +129,20 @@ class ChatBotTest {
         events.add(new EventLog.Event(1, "BLOCK", "evil-casino.xyz", "list", null, null, "c"));
         ChatBot local = new ChatBot(client("http://127.0.0.1:11434"), "m", stats, events);
         ChatBot remote = new ChatBot(client("http://10.0.0.5:11434"), "m", stats, events);
+        ChatBot cloud = new ChatBot(client("http://127.0.0.1:11434"), "gemma4:31b-cloud", stats, events);
         assertTrue(local.buildPrompt("q", local.rank("overrides")).contains("evil-casino.xyz"));
         assertFalse(remote.buildPrompt("q", remote.rank("overrides")).contains("evil-casino.xyz"));
+        // A cloud tag is served by ollama.com even though the endpoint is loopback.
+        assertFalse(cloud.buildPrompt("q", cloud.rank("overrides")).contains("evil-casino.xyz"));
+    }
+
+    @Test
+    void cloudModelDetection() {
+        assertTrue(ChatBot.isCloudModel("gemma4:31b-cloud"));
+        assertTrue(ChatBot.isCloudModel("kimi-k2.7-code:cloud"));
+        assertTrue(ChatBot.isCloudModel("qwen3:32b-CLOUD"));
+        assertFalse(ChatBot.isCloudModel("gemma3:4b"));
+        assertFalse(ChatBot.isCloudModel(null));
     }
 
     @Test

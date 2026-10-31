@@ -94,6 +94,16 @@ public final class Main {
             System.out.println("AI classifier: off (no --ai-model and no TRACEWALL_AI_MODEL)");
         }
 
+        // The dashboard chat can use its own model, so turning it on does not
+        // also make every unseen DNS name wait on a model call.
+        String chatModel = config.chatModel != null ? config.chatModel
+                : System.getenv("TRACEWALL_CHAT_MODEL");
+        if (chatModel == null || chatModel.isBlank()) chatModel = aiModel;
+        if (chatModel != null && !chatModel.isBlank() && chatClient == null) {
+            chatClient = new OllamaClient(config.aiUrl, java.time.Duration.ofSeconds(2),
+                    java.time.Duration.ofSeconds(120), java.time.Duration.ofSeconds(30));
+        }
+
         if (config.aiEval != null) {
             if (ai == null) {
                 throw new IllegalArgumentException("--ai-eval needs --ai-model or TRACEWALL_AI_MODEL");
@@ -139,11 +149,11 @@ public final class Main {
         AiClassifier classifier = ai;
         Dashboard dashboard = null;
         if (config.dashboardPort > 0) {
-            ChatBot chat = new ChatBot(chatClient, aiModel, stats, events);
+            ChatBot chat = new ChatBot(chatClient, chatModel, stats, events);
             dashboard = new Dashboard(InetAddress.getByName("127.0.0.1"), config.dashboardPort,
                     policy, stats, events, ai, chat);
             dashboard.start();
-            System.out.println("chat helper: " + (chat.usesModel() ? "model=" + aiModel : "docs only (no model)"));
+            System.out.println("chat helper: " + (chat.usesModel() ? "model=" + chatModel : "docs only (no model)"));
             System.out.println("dashboard: http://127.0.0.1:" + dashboard.port()
                     + "  (write token: " + dashboard.token() + ")");
         }
@@ -172,6 +182,7 @@ public final class Main {
         long statsIntervalSeconds = 10;
         int dashboardPort = 8080;
         String aiModel;
+        String chatModel;
         String aiUrl = OllamaClient.DEFAULT_BASE_URL;
         long aiWaitMs = 1500;
         double aiThreshold = 0.8;
@@ -200,6 +211,7 @@ public final class Main {
                     case "--dashboard-port" -> c.dashboardPort = Integer.parseInt(next(args, ++i));
                     case "--upstream" -> c.upstream.addAll(List.of(next(args, ++i).split(",")));
                     case "--ai-model" -> c.aiModel = next(args, ++i);
+                    case "--chat-model" -> c.chatModel = next(args, ++i);
                     case "--ai-url" -> c.aiUrl = next(args, ++i);
                     case "--ai-wait-ms" -> c.aiWaitMs = Long.parseLong(next(args, ++i));
                     case "--ai-threshold" -> c.aiThreshold = Double.parseDouble(next(args, ++i));
@@ -239,6 +251,8 @@ public final class Main {
                       --upstream IP[,IP]  upstream resolvers (default 1.1.1.1,8.8.8.8)
                       --ai-model TAG      Ollama model tag; omit to disable the AI layer
                                           (or set TRACEWALL_AI_MODEL)
+                      --chat-model TAG    model for the dashboard chat helper only; does not
+                                          turn on DNS classification (or TRACEWALL_CHAT_MODEL)
                       --ai-url URL        Ollama base URL (default http://127.0.0.1:11434)
                       --ai-wait-ms N      how long a query waits for the model (default 1500)
                       --ai-threshold F    confidence needed to block (default 0.8)

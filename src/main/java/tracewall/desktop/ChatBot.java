@@ -61,7 +61,7 @@ public final class ChatBot {
     private final Stats stats;
     private final EventLog events;
     private final List<Section> sections;
-    private final boolean loopbackModel;
+    private final boolean sharesHostnames;
     private final Semaphore gate = new Semaphore(1);
 
     /** Model-backed when {@code client} is non-null; docs-only otherwise. */
@@ -75,7 +75,10 @@ public final class ChatBot {
         this.stats = stats;
         this.events = events;
         this.sections = parse(knowledge);
-        this.loopbackModel = client != null && isLoopback(client.baseUrl());
+        // Hostnames are browsing history: they only go to a model that is both
+        // local and actually running on this machine. A "-cloud" tag is served
+        // by ollama.com even though the HTTP endpoint is loopback.
+        this.sharesHostnames = client != null && isLoopback(client.baseUrl()) && !isCloudModel(model);
     }
 
     public static ChatBot docsOnly(Stats stats, EventLog events) {
@@ -187,7 +190,7 @@ public final class ChatBot {
         List<Section> docs = relevant.isEmpty() ? sections.subList(0, Math.min(2, sections.size())) : relevant;
         for (Section s : docs) sb.append("## ").append(s.title()).append('\n').append(s.body()).append("\n\n");
         sb.append("LIVE STATE:\n").append(stats.oneLine()).append('\n');
-        if (loopbackModel) {
+        if (sharesHostnames) {
             // Hostnames are the user's browsing history: only hand them to a model on this machine.
             List<String> hosts = new ArrayList<>();
             List<EventLog.Event> recent = events.recent(200);
@@ -266,5 +269,12 @@ public final class ChatBot {
         } catch (IllegalArgumentException e) {
             return false;
         }
+    }
+
+    /** Ollama's cloud tags end in {@code -cloud} or {@code :cloud}; those leave the machine. */
+    static boolean isCloudModel(String tag) {
+        if (tag == null) return false;
+        String t = tag.toLowerCase(Locale.ROOT);
+        return t.endsWith("-cloud") || t.endsWith(":cloud");
     }
 }
