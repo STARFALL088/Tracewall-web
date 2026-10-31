@@ -271,13 +271,13 @@ document.getElementById("override-block").addEventListener("click", () => {
   const chips = document.getElementById("chat-chips");
   let waiting = false;
 
-  function add(kind, text, source) {
+  function add(kind, text, source, model) {
     const div = document.createElement("div");
     div.className = "msg " + kind;
     div.textContent = text;
     if (source) {
       const small = document.createElement("small");
-      small.textContent = source === "model" ? "local model" : "from the built-in docs";
+      small.textContent = source === "model" ? (model || "model answer") : "from the built-in docs";
       div.append(small);
     }
     log.append(div);
@@ -299,7 +299,7 @@ document.getElementById("override-block").addEventListener("click", () => {
       });
       const data = await res.json();
       pending.remove();
-      if (data.ok) add("bot", data.reply, data.source);
+      if (data.ok) add("bot", data.reply, data.source, data.model);
       else add("bot", "Sorry, that did not work (" + (data.error || res.status) + ").");
     } catch (err) {
       pending.remove();

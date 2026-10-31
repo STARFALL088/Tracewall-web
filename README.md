@@ -58,7 +58,7 @@ another machine, change that line or delete it; the `java.toolchain` block in
 `build.gradle.kts` still compiles for Java 17.
 
 ```bash
-./gradlew test                                  # 54 tests, no network calls in the tests
+./gradlew test                                  # 57 tests, no network calls in the tests
 ./gradlew run --args="--lists lists --allow example.com"
 ```
 
@@ -135,7 +135,9 @@ domain is answered from memory or from `ai-cache.tsv`.
 
 The dashboard has a small chat panel that answers questions about Tracewall:
 how a query is decided, what the stat cards mean, overrides, setup, privacy and
-the limits. It works in two modes:
+the limits. Name a domain and it reports the live verdict for that name; ask
+something general and the model answers from its own knowledge, labelled as
+such. It works in two modes:
 
 - **Docs only** (default, no model needed): it ranks the sections of
   `src/main/resources/about.md` against the question and shows the best match.
@@ -149,6 +151,14 @@ the limits. It works in two modes:
 Notes:
 
 - It only talks. It cannot change policy; for that, use the Override box.
+- Name a domain (`tiktok.com`, or just `tiktok` when the policy knows
+  `tiktok.com`) and the answer includes the current verdict from the running
+  policy: custom deny, category list, allowlist, or forwarded.
+- General questions are answered by the model and labelled "general knowledge,
+  not Tracewall documentation". It will not judge whether a site suits a child;
+  it reports the filter status and leaves that call to you.
+- The footer under each answer shows the model tag, so a cloud answer is never
+  labelled "local".
 - Recently blocked hostnames are added to the prompt only when the Ollama URL
   is loopback **and** the model tag is not a cloud tag (`-cloud` or `:cloud`),
   so neither `--ai-url` pointing at another machine nor a model served by
@@ -244,7 +254,7 @@ Ollama endpoint you configure.
 
 ## Testing
 
-`./gradlew test` runs 54 JUnit 5 tests; none of them make a network call:
+`./gradlew test` runs 57 JUnit 5 tests; none of them make a network call:
 
 - 11 classifier tests: domain validation, JSON decoding, one model call per
   registrable domain, cache persistence, failure expiry, malformed output,
@@ -255,10 +265,11 @@ Ollama endpoint you configure.
   CIDR matching;
 - 14 dashboard tests: JSON endpoints, token rejection, origin rejection,
   override precedence, chat endpoint auth and input limits, chat widget present;
-- 16 chat helper tests: section retrieval, allow/block wording, the four UI
+- 19 chat helper tests: section retrieval, allow/block wording, the four UI
   suggestion chips, off-topic handling, model answer, docs fallback on model
-  error or empty answer, busy handling, hostname privacy rule, cloud-tag
-  detection, question truncation.
+  error or empty answer, busy handling, live verdict for a named domain,
+  domain facts in the prompt, hostname privacy rule, cloud-tag detection,
+  question truncation.
 
 Everything model-related is exercised against an in-process fake Ollama
 (`com.sun.net.httpserver`). **No test runs a real model.** The classifier has not

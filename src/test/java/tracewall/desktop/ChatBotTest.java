@@ -3,6 +3,12 @@ package tracewall.desktop;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import tracewall.blocklist.DomainSet;
+import tracewall.blocklist.PolicyEngine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -15,6 +21,14 @@ class ChatBotTest {
 
     private static OllamaClient client(String url) {
         return new OllamaClient(url, Duration.ofSeconds(2), Duration.ofSeconds(5), Duration.ofSeconds(5));
+    }
+
+    /** A real engine with tiktok.com as a custom deny, like overrides.tsv does. */
+    private static ChatBot.Lookup tiktokPolicy() {
+        DomainSet deny = DomainSet.of(List.of("tiktok.com", "*.tiktok.com"));
+        PolicyEngine engine = new PolicyEngine(new DomainSet(), Map.of(), Set.of(),
+                deny, Map.of(), Map.of(), List.of());
+        return domain -> engine.decide(domain, -1);
     }
 
     @Test
@@ -134,6 +148,34 @@ class ChatBotTest {
         assertFalse(remote.buildPrompt("q", remote.rank("overrides")).contains("evil-casino.xyz"));
         // A cloud tag is served by ollama.com even though the endpoint is loopback.
         assertFalse(cloud.buildPrompt("q", cloud.rank("overrides")).contains("evil-casino.xyz"));
+    }
+
+    @Test
+    void aMentionedDomainGetsItsLiveStatusWithoutAModel() {
+        ChatBot bot = new ChatBot(null, null, stats, events, tiktokPolicy());
+        ChatBot.Reply reply = bot.answer("is tiktok safe for my son");
+        assertEquals("docs", reply.source());
+        assertTrue(reply.text().contains("tiktok.com is currently blocked by a custom override"),
+                reply.text());
+    }
+
+    @Test
+    void mentionedDomainsReachTheModelPrompt() throws Exception {
+        try (FakeOllama fake = new FakeOllama()) {
+            fake.inner = "TikTok is a short-video app. Tracewall blocks tiktok.com.";
+            ChatBot bot = new ChatBot(client(fake.url()), "m", stats, events, tiktokPolicy());
+            ChatBot.Reply reply = bot.answer("is tiktok safe for my son");
+            assertEquals("model", reply.source());
+            assertTrue(fake.lastBody.contains("MENTIONED DOMAINS"));
+            assertTrue(fake.lastBody.contains("tiktok.com is currently blocked by a custom override"));
+        }
+    }
+
+    @Test
+    void anUnlistedDomainIsReportedAsForwarded() {
+        ChatBot bot = new ChatBot(null, null, stats, events, tiktokPolicy());
+        ChatBot.Reply reply = bot.answer("what about example.com");
+        assertTrue(reply.text().contains("example.com is not on any list"), reply.text());
     }
 
     @Test

@@ -52,6 +52,12 @@ public final class PolicyHolder {
         return engine;
     }
 
+    /** Current decision for a name, for the chat helper; null when it is not a domain. */
+    public PolicyEngine.Decision decide(String domain) {
+        String d = normalise(domain);
+        return d == null ? null : engine.decide(d, -1);
+    }
+
     public Set<String> allowOverrides() {
         return Set.copyOf(allowOverrides);
     }

@@ -145,7 +145,7 @@ public final class Dashboard implements AutoCloseable {
         }
         ChatBot.Reply reply = chat.answer(message);
         send(exchange, 200, "application/json", "{\"ok\":true,\"reply\":\"" + json(reply.text())
-                + "\",\"source\":\"" + reply.source() + "\"}");
+                + "\",\"source\":\"" + reply.source() + "\",\"model\":\"" + json(chat.model()) + "\"}");
     }
 
     private void handleOverride(HttpExchange exchange) throws IOException {

@@ -149,7 +149,7 @@ public final class Main {
         AiClassifier classifier = ai;
         Dashboard dashboard = null;
         if (config.dashboardPort > 0) {
-            ChatBot chat = new ChatBot(chatClient, chatModel, stats, events);
+            ChatBot chat = new ChatBot(chatClient, chatModel, stats, events, policy::decide);
             dashboard = new Dashboard(InetAddress.getByName("127.0.0.1"), config.dashboardPort,
                     policy, stats, events, ai, chat);
             dashboard.start();
